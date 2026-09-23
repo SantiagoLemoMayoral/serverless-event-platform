@@ -32,8 +32,9 @@ jobs:
       - name: Lint
         run: ruff check .
 
-      - name: Test
-        run: pytest
+      # Keep this only when you actually have tests
+      # - name: Test
+      #   run: pytest
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -41,27 +42,57 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-
-          docker push \
-            $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
+      # Terraform must exist BEFORE we use terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
         working-directory: infra/terraform
         run: terraform init
+
+      # Bootstrap ECR so Docker has somewhere to push
+      - name: Ensure ECR repository exists
+        working-directory: infra/terraform
+        run: |
+          terraform apply \
+            -target=aws_ecr_repository.lambda \
+            -auto-approve \
+            -var="image_tag=bootstrap"
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Lambda images
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Handler
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:handler-$IMAGE_TAG \
+            services/handler
+
+          docker push \
+            $ECR_REGISTRY/$ECR_REPOSITORY:handler-$IMAGE_TAG
+
+
+          # Object worker
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:object-worker-$IMAGE_TAG \
+            services/object_worker
+
+          docker push \
+            $ECR_REGISTRY/$ECR_REPOSITORY:object-worker-$IMAGE_TAG
+
+
+          # Metadata worker
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:metadata-worker-$IMAGE_TAG \
+            services/metadata_worker
+
+          docker push \
+            $ECR_REGISTRY/$ECR_REPOSITORY:metadata-worker-$IMAGE_TAG
 
       - name: Terraform Apply
         working-directory: infra/terraform
