@@ -83,6 +83,9 @@ resource "aws_iam_role_policy" "object_worker_s3" {
   })
 }
 
+# ───────────────  ───────────────
+
+
 resource "aws_iam_role" "metadata_worker" {
   name               = "${local.project}-metadata-worker-role"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
@@ -117,6 +120,8 @@ resource "aws_iam_role_policy" "metadata_worker_dynamodb" {
     ]
   })
 }
+
+# ───────────────  ───────────────
 
 data "aws_iam_policy_document" "objects_queue" {
   statement {

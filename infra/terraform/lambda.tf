@@ -1,30 +1,10 @@
-data "archive_file" "handler" {
-  type        = "zip"
-  source_file = "${path.module}/../services/handler/handler.py"
-  output_path = "${path.module}/handler.zip"
-}
-
-data "archive_file" "object_worker" {
-  type        = "zip"
-  source_file = "${path.module}/../services/object_worker/handler.py"
-  output_path = "${path.module}/object-worker.zip"
-}
-
-data "archive_file" "metadata_worker" {
-  type        = "zip"
-  source_file = "${path.module}/../services/metadata_worker/handler.py"
-  output_path = "${path.module}/metadata-worker.zip"
-}
-
 resource "aws_lambda_function" "handler" {
   function_name = "${local.project}-handler"
+  role          = aws_iam_role.handler.arn
 
-  role    = aws_iam_role.handler.arn
-  runtime = "python3.13"
-  handler = "handler.lambda_handler"
+  package_type = "Image"
 
-  filename         = data.archive_file.handler.output_path
-  source_code_hash = data.archive_file.handler.output_base64sha256
+  image_uri = "${aws_ecr_repository.lambda.repository_url}:handler-${var.image_tag}"
 
   timeout = 10
 
@@ -43,15 +23,14 @@ resource "aws_lambda_function" "handler" {
   ]
 }
 
+
 resource "aws_lambda_function" "object_worker" {
   function_name = "${local.project}-object-worker"
+  role          = aws_iam_role.object_worker.arn
 
-  role    = aws_iam_role.object_worker.arn
-  runtime = "python3.13"
-  handler = "handler.lambda_handler"
+  package_type = "Image"
 
-  filename         = data.archive_file.object_worker.output_path
-  source_code_hash = data.archive_file.object_worker.output_base64sha256
+  image_uri = "${aws_ecr_repository.lambda.repository_url}:object-worker-${var.image_tag}"
 
   timeout = 30
 
@@ -70,15 +49,14 @@ resource "aws_lambda_function" "object_worker" {
   ]
 }
 
+
 resource "aws_lambda_function" "metadata_worker" {
   function_name = "${local.project}-metadata-worker"
+  role          = aws_iam_role.metadata_worker.arn
 
-  role    = aws_iam_role.metadata_worker.arn
-  runtime = "python3.13"
-  handler = "handler.lambda_handler"
+  package_type = "Image"
 
-  filename         = data.archive_file.metadata_worker.output_path
-  source_code_hash = data.archive_file.metadata_worker.output_base64sha256
+  image_uri = "${aws_ecr_repository.lambda.repository_url}:metadata-worker-${var.image_tag}"
 
   timeout = 30
 
@@ -97,6 +75,7 @@ resource "aws_lambda_function" "metadata_worker" {
   ]
 }
 
+
 resource "aws_lambda_event_source_mapping" "objects" {
   event_source_arn = aws_sqs_queue.objects.arn
   function_name    = aws_lambda_function.object_worker.arn
@@ -111,6 +90,7 @@ resource "aws_lambda_event_source_mapping" "objects" {
     aws_iam_role_policy_attachment.object_worker_sqs
   ]
 }
+
 
 resource "aws_lambda_event_source_mapping" "metadata" {
   event_source_arn = aws_sqs_queue.metadata.arn
