@@ -8,7 +8,6 @@ eventbridge = boto3.client("events")
 
 EVENT_BUS_NAME = os.environ["EVENT_BUS_NAME"]
 
-
 ROUTES = {
     "object": "object.created",
     "metadata": "metadata.created",
@@ -50,9 +49,7 @@ def lambda_handler(event, context):
         )
 
         if response["FailedEntryCount"] > 0:
-            raise RuntimeError(
-                f"EventBridge failed: {response['Entries']}"
-            )
+            raise RuntimeError("Failed to publish EventBridge event")
 
         return {
             "statusCode": 202,
@@ -68,6 +65,6 @@ def lambda_handler(event, context):
         return {
             "statusCode": 500,
             "body": json.dumps({
-                "error": "internal error"
+                "error": "internal server error"
             }),
         }

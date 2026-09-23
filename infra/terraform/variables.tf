@@ -12,6 +12,3 @@ variable "environment" {
   default = "dev"
 }
 
-variable "image_tag" {
-  type = string
-}
